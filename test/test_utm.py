@@ -382,7 +382,7 @@ class TestForcingNorthSouth(unittest.TestCase):
             result = UTM.from_latlon(lats, np.array([0, 0]), 31, zone)
             for expected_lat, easting, northing in zip(lats, *result[:2]):
                 self.assert_zone_equal_northern(
-                    (easting, northing, *result[2:]),
+                    (easting, northing, result[2], result[3]),
                     31, zone, expected_lat, zone >= 'N')
 
 if __name__ == '__main__':
