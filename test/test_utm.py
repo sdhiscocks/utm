@@ -335,5 +335,55 @@ class TestForcingZones(unittest.TestCase):
         self.assert_zone_equal(UTM.from_latlon(40.71435, -74.00597, 18, 'u'), 18, 'U')
         self.assert_zone_equal(UTM.from_latlon(40.71435, -74.00597, 18, 'S'), 18, 'S')
 
+
+class TestForcingNorthSouth(unittest.TestCase):
+    def assert_zone_equal_northern(self, result, expected_number,
+            expected_letter, expected_lat, expected_northern):
+        self.assertEqual(result[2], expected_number)
+        self.assertEqual(result[3], expected_letter)
+
+        if expected_lat < 0 and expected_northern:
+            self.assertTrue(result[1] < 0)
+        elif expected_lat >= 0 and not expected_northern:
+            self.assertTrue(result[1] > 1E7)
+
+        # Let's also check reverse conversion
+        lat, _ = UTM.to_latlon(
+            *result[:3], northern=expected_northern, strict=False)
+        self.assertAlmostEqual(lat, expected_lat, 6)
+
+    def test_force_north(self):
+        # Force southern point to northern zone letter
+        self.assert_zone_equal_northern(
+            UTM.from_latlon(-0.1, 0, 31, 'N'), 31, 'N', -0.1, True)
+
+        # Again, using force northern
+        self.assert_zone_equal_northern(
+            UTM.from_latlon(-0.1, 0, 31, None, True), 31, None, -0.1, True)
+
+    def test_force_south(self):
+        # Force northern point to southern zone letter
+        self.assert_zone_equal_northern(
+            UTM.from_latlon(0.1, 0, 31, 'M'), 31, 'M', 0.1, False)
+
+        # Again, using force northern as False
+        self.assert_zone_equal_northern(
+            UTM.from_latlon(0.1, 0, 31, None, False), 31, None, 0.1, False)
+
+    def test_force_numpy(self):
+        if not use_numpy:
+            return
+        # Point above and below equator
+        lats = np.array([-0.1, 0.1])
+        # Northern, Southern zone
+        zones = ('N', 'M')
+
+        for zone in zones:
+            result = UTM.from_latlon(lats, np.array([0, 0]), 31, zone)
+            for expected_lat, easting, northing in zip(lats, *result[:2]):
+                self.assert_zone_equal_northern(
+                    (easting, northing, *result[2:]),
+                    31, zone, expected_lat, zone >= 'N')
+
 if __name__ == '__main__':
     unittest.main()
