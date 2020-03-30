@@ -61,16 +61,6 @@ def check_valid_zone(zone_number, zone_letter):
             raise OutOfRangeError('zone letter out of range (must be between C and X)')
 
 
-def mixed_signs(x):
-    return use_numpy and mathlib.min(x) < 0 and mathlib.max(x) >= 0
-
-
-def negative(x):
-    if use_numpy:
-        return mathlib.max(x) < 0
-    return x < 0
-
-
 def mod_angle(value):
     """Returns angle in radians to be between -pi and pi"""
     return (value + mathlib.pi) % (2 * mathlib.pi) - mathlib.pi
@@ -96,7 +86,8 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, s
             Designators can be accessed in [1]_
 
         northern: bool
-            You can set True or False to set this parameter. Default is None
+            You can set True (North) or False (South) as an alternative to
+            providing a zone letter. Default is None
 
 
        .. _[1]: http://www.jaworski.ca/utmzones.htm
@@ -175,7 +166,7 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, s
             mathlib.degrees(longitude))
 
 
-def from_latlon(latitude, longitude, force_zone_number=None, force_zone_letter=None):
+def from_latlon(latitude, longitude, force_zone_number=None, force_zone_letter=None, force_northern=None):
     """This function convert Latitude and Longitude to UTM coordinate
 
         Parameters
@@ -191,12 +182,24 @@ def from_latlon(latitude, longitude, force_zone_number=None, force_zone_letter=N
             Numbers Map. You may force conversion including one UTM Zone Number.
             More information see utmzones [1]_
 
+        force_zone_letter: str
+            Zone Letter can be represented as string values.You may force
+            conversion including one UTM Zone Letter. Where UTM Zone
+            Designators can be accessed in [1]_
+
+        force_northern: bool
+            You can set True (North) or False (South) as an alternative to
+            forcing with a zone letter. When set, the returned zone_letter will
+            be None. Default is None
+
        .. _[1]: http://www.jaworski.ca/utmzones.htm
     """
     if not in_bounds(latitude, -80.0, 84.0):
         raise OutOfRangeError('latitude out of range (must be between 80 deg S and 84 deg N)')
     if not in_bounds(longitude, -180.0, 180.0):
         raise OutOfRangeError('longitude out of range (must be between 180 deg W and 180 deg E)')
+    if force_zone_letter and force_northern is not None:
+        raise ValueError('set either force_zone_letter or force_northern, but not both')
     if force_zone_number is not None:
         check_valid_zone(force_zone_number, force_zone_letter)
 
@@ -213,10 +216,15 @@ def from_latlon(latitude, longitude, force_zone_number=None, force_zone_letter=N
     else:
         zone_number = force_zone_number
 
-    if force_zone_letter is None:
+    if force_zone_letter is None and force_northern is None:
         zone_letter = latitude_to_zone_letter(latitude)
     else:
         zone_letter = force_zone_letter
+
+    if force_northern is None:
+        northern = (zone_letter >= 'N')
+    else:
+        northern = force_northern
 
     lon_rad = mathlib.radians(longitude)
     central_lon = zone_number_to_central_longitude(zone_number)
@@ -245,9 +253,7 @@ def from_latlon(latitude, longitude, force_zone_number=None, force_zone_letter=N
                                         a4 / 24 * (5 - lat_tan2 + 9 * c + 4 * c**2) +
                                         a6 / 720 * (61 - 58 * lat_tan2 + lat_tan4 + 600 * c - 330 * E_P2)))
 
-    if mixed_signs(latitude):
-        raise ValueError("latitudes must all have the same sign")
-    elif negative(latitude):
+    if not northern:
         northing += 10000000
 
     return easting, northing, zone_number, zone_letter
